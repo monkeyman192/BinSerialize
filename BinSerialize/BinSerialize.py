@@ -3,6 +3,7 @@ import struct
 import inspect
 
 from .core import dtype
+from .core.complextypes import _filesize
 
 
 class BinSerialize():
@@ -23,20 +24,21 @@ class BinSerialize():
 
     def _serialize_pointer_data(self, fobj):
         filesize_data = None
-        for loc, data in self._pointer_data:
+        for pointer_data in self._pointer_data:
             # If it is filesize data leave it until the end
-            if isinstance(data, dtype.filesize):
-                filesize_data = (loc, data)
+            if isinstance(pointer_data, _filesize):
+                filesize_data = pointer_data
                 continue
             # get the location of the end of the file
             data_loc = fobj.tell()
             # serialize the data the pointer points to
-            data.value.serialize(fobj)
-            fobj.seek(loc)
-            if data.offset_mode == 'abs':
-                offset = struct.pack(data.offset_dtype.fmt, data_loc)
-            elif data.offset_mode == 'rel':
-                offset = struct.pack(data.offset_dtype.fmt, data_loc - loc)
+            pointer_data.data_dtype.serialize(fobj, self._pointer_data)
+            fobj.seek(pointer_data['offset'])
+            if pointer_data.offset_mode == 'abs':
+                offset = struct.pack(pointer_data.offset_dtype.fmt, data_loc)
+            elif pointer_data.offset_mode == 'rel':
+                offset = struct.pack(pointer_data.offset_dtype.fmt,
+                                     data_loc - pointer_data['offset'])
             fobj.write(offset)
             fobj.seek(0, 2)
         if filesize_data is not None:
@@ -45,10 +47,9 @@ class BinSerialize():
             # getting the location
             fobj.seek(0, 2)
             size = fobj.tell()
-            loc, data = filesize_data
             # Then write this size into the required location
-            fobj.seek(loc)
-            fobj.write(struct.pack(data.value_dtype.fmt, size))
+            fobj.seek(filesize_data['offset'])
+            fobj.write(struct.pack(filesize_data.value_dtype.fmt, size))
 
     def deserialize(self, fname):
         if isinstance(fname, str):
@@ -68,7 +69,7 @@ class BinSerialize():
     def __setattr__(self, name, value):
         if inspect.isclass(value):
             # If the type is uninstantiated we instantiate it
-            if issubclass(value, type(dtype)):
+            if issubclass(value, dtype):
                 # add to the structure
                 if name[0] == '_':
                     self._structure[name] = value()

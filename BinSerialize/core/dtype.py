@@ -47,10 +47,16 @@ class dtype():
         else:
             fobj.write(bytes(self))
 
+    def set_value(self, value):
+        self._value = value
+
 # private methods
 
     def _set_value(self, value):
-        self._value = value
+        if isinstance(self, type(value)):
+            self._value = value
+        else:
+            self.set_value(value)
 
 # properties
 
@@ -78,4 +84,4 @@ class dtype():
     def __getattr__(self, name):
         if name in self.registered_funcs:
             return self.registered_funcs[name]
-        raise AttributeError
+        raise AttributeError("Attribute '{0}' not found".format(name))
